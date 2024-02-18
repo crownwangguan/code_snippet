@@ -1,27 +1,32 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"flag"
+	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 )
 
+type application struct {
+	logger *slog.Logger
+}
+
 func main() {
-	mux := http.NewServeMux()
+	addr := flag.String("addr", ":4000", "HTTP network address")
+	flag.Parse()
 
-	fileServer := http.FileServer(neuteredFileSystem{http.Dir("./static")})
-	mux.Handle("/static", http.NotFoundHandler())
-	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	mux.HandleFunc("/", home)
-	mux.HandleFunc("/snippet/view", snippetView)
-	mux.HandleFunc("/snippet/create", snippetCreate)
+	app := &application{
+		logger: logger,
+	}
 
-	fmt.Println("starting server on :4000")
+	logger.Info("starting server", "addr", *addr)
 
-	err := http.ListenAndServe(":4000", mux)
-	log.Fatal(err)
+	err := http.ListenAndServe(*addr, app.routes())
+	logger.Error(err.Error())
+	os.Exit(1)
 }
 
 type neuteredFileSystem struct {
